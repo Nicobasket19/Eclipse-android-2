@@ -1,0 +1,53 @@
+
+name: Build ECLIPSE Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.3
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Inspect archive
+        run: |
+          set -eux
+          unzip -l Eclipse_CloudBuild_Android_Godot43.zip
+          mkdir -p source
+          unzip -oq Eclipse_CloudBuild_Android_Godot43.zip -d source
+          find source -name project.godot -print
+
+      - name: Locate and validate project
+        run: |
+          set -eux
+          PROJECT_FILE="$(find source -name project.godot -type f -print -quit)"
+          test -n "$PROJECT_FILE"
+          echo "PROJECT_DIR=$(dirname "$PROJECT_FILE")" >> "$GITHUB_ENV"
+
+      - name: Check Godot project
+        run: |
+          set -eux
+          godot --headless --editor --path "$PROJECT_DIR" --quit
+
+      - name: Export Android APK
+        run: |
+          set -eux
+          test -f "$PROJECT_DIR/export_presets.cfg"
+          mkdir -p build
+          godot --headless --path "$PROJECT_DIR" --export-debug Android "$GITHUB_WORKSPACE/build/ECLIPSE-debug.apk"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ECLIPSE-Android-APK
+          path: build/ECLIPSE-debug.apk
+          if-no-files-found: error
